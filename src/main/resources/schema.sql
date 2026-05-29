@@ -1,0 +1,1 @@
+You can uncomment the above if you prefer to manage schema manually.
