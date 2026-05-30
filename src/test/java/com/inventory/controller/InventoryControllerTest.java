@@ -5,14 +5,25 @@ import com.inventory.dto.InventoryItemRequest;
 import com.inventory.dto.InventoryItemResponse;
 import com.inventory.service.InventoryService;
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.bean.MockBean;
+import org.springframework.context.annotation.Bean;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.TestConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.filter.OncePerRequestFilter;
 
+import javax.servlet.FilterChain;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -71,5 +82,34 @@ class InventoryControllerTest {
         mockMvc.perform(get("/api/inventory"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1));
+    }
+
+    @TestConfiguration
+    static class LoggingFilterConfig {
+
+        private static final Logger logger = LoggerFactory.getLogger("RequestLogging");
+        private static final DateTimeFormatter formatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+
+        @Bean
+        public OncePerRequestFilter loggingFilter() {
+            return new OncePerRequestFilter() {
+                @Override
+                protected void doFilterInternal(HttpServletRequest request,
+                                                HttpServletResponse response,
+                                                FilterChain chain)
+                        throws ServletException, IOException {
+                    long start = System.currentTimeMillis();
+                    chain.doFilter(request, response);
+                    long duration = System.currentTimeMillis() - start;
+                    String timestamp = LocalDateTime.now().format(formatter);
+                    logger.info("{} {} {} {} {}ms",
+                            timestamp,
+                            request.getMethod(),
+                            request.getRequestURI(),
+                            response.getStatus(),
+                            duration);
+                }
+            };
+        }
     }
 }
