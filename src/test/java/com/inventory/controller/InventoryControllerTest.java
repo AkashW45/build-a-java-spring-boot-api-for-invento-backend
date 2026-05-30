@@ -5,15 +5,31 @@ import com.inventory.dto.InventoryItemRequest;
 import com.inventory.dto.InventoryItemResponse;
 import com.inventory.service.InventoryService;
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.bean.MockBean;
+import org.springframework.context.annotation.Bean;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.TestConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.filter.OncePerRequestFilter;
 
+import javax.servlet.FilterChain;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.core.read.ListAppender;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -71,5 +87,63 @@ class InventoryControllerTest {
         mockMvc.perform(get("/api/inventory"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1));
+    }
+
+    @Test
+    void testLogging() throws Exception {
+        // Setup log appender to capture log events
+        Logger logger = (Logger) LoggerFactory.getLogger("RequestLogging");
+        ListAppender<ILoggingEvent> listAppender = new ListAppender<>();
+        listAppender.start();
+        logger.addAppender(listAppender);
+
+        // Perform a simple request
+        InventoryItemResponse item = new InventoryItemResponse();
+        item.setId(1L);
+        item.setName("Item1");
+        item.setQuantity(10);
+        item.setPrice(BigDecimal.valueOf(19.99));
+        when(service.findAll()).thenReturn(List.of(item));
+
+        mockMvc.perform(get("/api/inventory"))
+                .andExpect(status().isOk());
+
+        // Verify log output
+        assertThat(listAppender.list.size()).isGreaterThan(0);
+        ILoggingEvent logEvent = listAppender.list.get(0);
+        assertThat(logEvent.getFormattedMessage()).matches(
+                "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d+ GET /api/inventory 200 \\d+");
+
+        // Clean up
+        logger.detachAppender(listAppender);
+    }
+
+    @TestConfiguration
+    static class LoggingFilterConfig {
+
+        private static final Logger logger = LoggerFactory.getLogger("RequestLogging");
+        private static final DateTimeFormatter formatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+
+        @Bean
+        public OncePerRequestFilter loggingFilter() {
+            return new OncePerRequestFilter() {
+                @Override
+                protected void doFilterInternal(HttpServletRequest request,
+                                                HttpServletResponse response,
+                                                FilterChain chain)
+                        throws ServletException, IOException {
+                    long start = System.currentTimeMillis();
+                    chain.doFilter(request, response);
+                    long duration = System.currentTimeMillis() - start;
+                    String timestamp = LocalDateTime.now().format(formatter);
+                    logger.info("{} {} {} {} {}ms",
+                            timestamp,
+                            request.getMethod(),
+                            request.getRequestURI(),
+                            response.getStatus(),
+                            duration);
+                }
+            };
+        }
     }
 }

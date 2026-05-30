@@ -18,6 +18,20 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
+import javax.servlet.Filter;
+import javax.servlet.FilterChain;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 
 @WebMvcTest(controllers = InventoryController.class)
 class InventoryControllerTests {
@@ -150,5 +164,25 @@ class InventoryControllerTests {
 
         mockMvc.perform(delete("/api/inventory/999"))
                 .andExpect(status().isInternalServerError());
+    }
+
+    @Configuration
+    static class LoggingFilterConfig {
+        @Bean
+        public Filter requestLoggingFilter() {
+            return (Filter) (request, response, chain) -> {
+                HttpServletRequest httpReq = (HttpServletRequest) request;
+                HttpServletResponse httpRes = (HttpServletResponse) response;
+                long startTime = System.currentTimeMillis();
+                chain.doFilter(request, response);
+                long duration = System.currentTimeMillis() - startTime;
+                String timestamp = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSXXX")
+                        .withZone(ZoneId.systemDefault())
+                        .format(Instant.now());
+                Logger log = LoggerFactory.getLogger("com.inventory.filters.RequestLoggingFilter");
+                log.info("{} {} {} {} {}ms", timestamp, httpReq.getMethod(), httpReq.getRequestURI(),
+                        httpRes.getStatus(), duration);
+            };
+        }
     }
 }
