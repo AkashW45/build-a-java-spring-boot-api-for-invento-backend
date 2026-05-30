@@ -67,26 +67,7 @@ class InventoryControllerTests {
                 .andExpect(jsonPath("$.quantity").value(10));
 
         verify(service).create(any(InventoryItemRequest.class));
-        @Configuration
-    static class LoggingFilterConfig {
-        @Bean
-        public Filter requestLoggingFilter() {
-            return (Filter) (request, response, chain) -> {
-                HttpServletRequest httpReq = (HttpServletRequest) request;
-                HttpServletResponse httpRes = (HttpServletResponse) response;
-                long startTime = System.currentTimeMillis();
-                chain.doFilter(request, response);
-                long duration = System.currentTimeMillis() - startTime;
-                String timestamp = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSXXX")
-                        .withZone(ZoneId.systemDefault())
-                        .format(Instant.now());
-                Logger log = LoggerFactory.getLogger(InventoryControllerTests.class);
-                log.info("{} {} {} {} {}ms", timestamp, httpReq.getMethod(), httpReq.getRequestURI(),
-                        httpRes.getStatus(), duration);
-            };
-        }
     }
-}
 
     @Test
     void create_ShouldReturnBadRequestWhenInvalid() throws Exception {
@@ -183,5 +164,25 @@ class InventoryControllerTests {
 
         mockMvc.perform(delete("/api/inventory/999"))
                 .andExpect(status().isInternalServerError());
+    }
+
+    @Configuration
+    static class LoggingFilterConfig {
+        @Bean
+        public Filter requestLoggingFilter() {
+            return (Filter) (request, response, chain) -> {
+                HttpServletRequest httpReq = (HttpServletRequest) request;
+                HttpServletResponse httpRes = (HttpServletResponse) response;
+                long startTime = System.currentTimeMillis();
+                chain.doFilter(request, response);
+                long duration = System.currentTimeMillis() - startTime;
+                String timestamp = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSXXX")
+                        .withZone(ZoneId.systemDefault())
+                        .format(Instant.now());
+                Logger log = LoggerFactory.getLogger(InventoryControllerTests.class);
+                log.info("{} {} {} {} {}ms", timestamp, httpReq.getMethod(), httpReq.getRequestURI(),
+                        httpRes.getStatus(), duration);
+            };
+        }
     }
 }
