@@ -26,6 +26,11 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.core.read.ListAppender;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -82,6 +87,35 @@ class InventoryControllerTest {
         mockMvc.perform(get("/api/inventory"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1));
+    }
+
+    @Test
+    void testLogging() throws Exception {
+        // Setup log appender to capture log events
+        Logger logger = (Logger) LoggerFactory.getLogger("RequestLogging");
+        ListAppender<ILoggingEvent> listAppender = new ListAppender<>();
+        listAppender.start();
+        logger.addAppender(listAppender);
+
+        // Perform a simple request
+        InventoryItemResponse item = new InventoryItemResponse();
+        item.setId(1L);
+        item.setName("Item1");
+        item.setQuantity(10);
+        item.setPrice(BigDecimal.valueOf(19.99));
+        when(service.findAll()).thenReturn(List.of(item));
+
+        mockMvc.perform(get("/api/inventory"))
+                .andExpect(status().isOk());
+
+        // Verify log output
+        assertThat(listAppender.list.size()).isGreaterThan(0);
+        ILoggingEvent logEvent = listAppender.list.get(0);
+        assertThat(logEvent.getFormattedMessage()).matches(
+                "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d+ GET /api/inventory 200 \\d+");
+
+        // Clean up
+        logger.detachAppender(listAppender);
     }
 
     @TestConfiguration

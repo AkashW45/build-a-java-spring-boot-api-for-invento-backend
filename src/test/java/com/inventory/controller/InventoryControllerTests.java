@@ -179,7 +179,7 @@ class InventoryControllerTests {
                 String timestamp = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSXXX")
                         .withZone(ZoneId.systemDefault())
                         .format(Instant.now());
-                Logger log = LoggerFactory.getLogger(InventoryControllerTests.class);
+                Logger log = LoggerFactory.getLogger("com.inventory.filters.RequestLoggingFilter");
                 log.info("{} {} {} {} {}ms", timestamp, httpReq.getMethod(), httpReq.getRequestURI(),
                         httpRes.getStatus(), duration);
             };
